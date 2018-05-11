@@ -16,6 +16,9 @@ TAG_FILTER="${TAG_FILTER:-cat}"
 CIRCLE_NODE_TOTAL=${CIRCLE_NODE_TOTAL:-1}
 CIRCLE_NODE_INDEX=${CIRCLE_NODE_INDEX:-0}
 
+# find_tags_and_aliases queries the Docker Hub API to retrieve the list of tags
+# for an image. Prints lines of comma separated tags and aliases where each line
+# is the set of aliases for an image.
 function find_tags_and_aliases() {
   ALPINE_TAG="-e alpine"
   if [[ $INCLUDE_ALPINE == "true" ]]
@@ -28,7 +31,6 @@ function find_tags_and_aliases() {
     | sed  's/^.*Tags: //g' \
     | grep -v $ALPINE_TAG -e 'slim' -e 'onbuild' -e windows -e wheezy -e nanoserver \
     | ${TAG_FILTER} \
-    | sed 's/, /:/' \
     | sed 's/, /,/g' \
     | sort | awk "NR % ${CIRCLE_NODE_TOTAL} == ${CIRCLE_NODE_INDEX}"
 
@@ -122,13 +124,9 @@ mkdir -p images
 
 for tag_aliases in $(find_tags_and_aliases)
 do
-  tag=$(echo "$tag_aliases" | cut -d: -f1)
-
-  aliases=""
-  if $(echo "$tag_aliases" | grep -q :)
-  then
-    aliases=$(echo "$tag_aliases" | cut -d: -f2)
-  fi
+  tags="$(echo "$tag_aliases" | tr ',', '\n' | sort | xargs | tr ' ' ',')"
+  tag="$(echo "$tags" | cut -d,  -f1)"
+  aliases="$(echo "$tags" | cut -d,  -f2-)"
 
   echo Generating $(basename `pwd`) $tag Dockerfile
 
